@@ -1,0 +1,97 @@
+#Import Required Packages
+```{r}
+# install packages if not exist
+for (p in c("pdfetch", "corrplot", "repr", "quantmod", "tidyquant")) 
+    if (!require(p, character.only=TRUE)) 
+        install.packages(p, repos="http://cran.us.r-project.org")
+
+library(quantmod)
+library(pdfetch)
+library(corrplot)
+library(cluster)
+options(warn=-1)
+
+library(tidyquant)
+
+# Install and load tidyquant package
+if (!requireNamespace("tidyquant", quietly = TRUE)) {
+  install.packages("tidyquant")
+}
+library(tidyquant)
+
+# Get all company stock symbols
+stock_symbols <- stockSymbols()
+
+# Print the first few rows of the data frame
+head(stock_symbols)
+
+
+tq_get(c("GOOGL","AMZN","FB","AAPL"), get="stock.prices") %>%
+  ggplot(aes(date, close, color=symbol)) +
+  geom_line()
+```
+
+#Load Data
+```{r}
+companies <- read.csv('companies.csv')
+View(companies)
+
+`from_date <- "2011-01-01"
+to_date <- "2021-12-31"
+
+pdfetch_YAHOO(stock_name, fields	=	c("open",	"high",	"low",	"close", "adjclose",	"volume"),	
+              from	=	as.Date(from_date), to	=	as.Date(to_date), interval	=	"1d")
+
+pdfetch_YAHOO('AAPL', from = from_date, to_date)
+
+stock_data <- NULL
+for (comp_ind in 1:nrow(companies)) {
+  comp_symbol <- companies[comp_ind, 1]
+  comp_stock_data <- pdfetch_YAHOO(comp_symbol, fields = 'close', from = from_date, to = to_date)
+  if (is.null(stock_data)) {
+    stock_data <- data.frame(matrix(ncol = 0, nrow = nrow(comp_stock_data)))
+  }
+  stock_data <- cbind(stock_data, comp_stock_data[,paste(comp_symbol, '.close', sep='')])
+}
+
+View(stock_data)
+```
+
+
+```{r}
+company_index <- 6 #Select a company index from 1 through 15
+company_name <- companies[company_index, 2]
+company_stock_data <- ts(stock_data[, company_index], frequency = 365, start=c(2011,1))
+plot.ts(company_stock_data, main = paste("Closing Stock of",company_name,"over Time"), xlab = "Years", ylab = "Closing Stock Price")
+
+decomposed_company_stock_data <- decompose(company_stock_data, "multiplicative")
+plot(decomposed_company_stock_data)
+
+#ref: https://rpubs.com/davoodastaraky/TSA1
+```
+
+#Extract Frequencies for each of the companies
+```{r}
+num_top_freqs <- 5
+
+freqs <- data.frame(matrix(ncol = num_top_freqs, nrow = 0))
+for (company_index in 1:nrow(companies)) {
+  company_name <- companies[company_index, 2]
+  company_stock_data <- ts(stock_data[, company_index], frequency = 365, start=c(2011,1))
+  
+  freqs <- rbind(time_periods, fft(company_stock_data)[1:num_top_freqs])
+}
+colnames(freqs) <- 1:num_top_freqs
+head(freqs)
+```
+
+
+#Clustering
+```{r}
+model <- kmeans(freqs, 3)
+
+print(model)
+
+clusplot(freqs, model$cluster)
+```
+
